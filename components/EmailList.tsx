@@ -65,7 +65,7 @@ export default function EmailList({
 
   return (
     <div>
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex justify-between items-center p-10">
         <h2 className="text-2xl font-bold">Email Archive</h2>
         <button
           onClick={fetchAndStoreEmails}
