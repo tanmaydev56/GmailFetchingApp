@@ -2,11 +2,14 @@ import EmailList from '@/components/EmailList';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
-import DashboardHeader from '@/components/DashboardHeader';
-import SidebarNavigation from '@/components/SidebarNavigation';
-import EmailStatsCards from '@/components/EmailStatsCards';
+// import DashboardHeader from '@/components/DashboardHeader';
+// import SidebarNavigation from '@/components/SidebarNavigation';
+// import EmailStatsCards from '@/components/EmailStatsCards';
 import { Suspense } from 'react';
-import EmailListSkeleton from '@/components/skeletons/EmailListSkeleton';
+
+import EmailStatsCards from '@/components/EmailStatus';
+import EmailListSkeleton from '@/components/EmailListSkeleton';
+// import EmailListSkeleton from '@/components/skeletons/EmailListSkeleton';
 
 export default async function DashboardPage({
   searchParams,
@@ -46,11 +49,11 @@ export default async function DashboardPage({
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar Navigation */}
-      <SidebarNavigation activeLabel={label} />
+      {/* <SidebarNavigation activeLabel={label} /> */}
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Dashboard Header */}
-        <DashboardHeader user={session.user} searchQuery={searchQuery} />
+        {/* <DashboardHeader user={session.user} searchQuery={searchQuery} /> */}
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-6">
@@ -63,7 +66,7 @@ export default async function DashboardPage({
               <EmailList 
                 emails={data.data} 
                 pagination={data.pagination}
-                currentLabel={label}
+                
               />
             </div>
           </Suspense>
