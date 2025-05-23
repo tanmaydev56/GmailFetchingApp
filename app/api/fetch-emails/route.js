@@ -1,8 +1,12 @@
+// api/fetch-emails/route.js
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { query } from '@/lib/db';
 import { google } from 'googleapis';
+
+// Store the last processed historyId
+let lastHistoryId = null;
 
 export async function POST() {
   try {
@@ -24,17 +28,29 @@ export async function POST() {
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-    // Fetch messages with pagination
-    const res = await gmail.users.messages.list({
+    // Get current historyId to track new emails
+    const profile = await gmail.users.getProfile({ userId: 'me' });
+    const currentHistoryId = profile.data.historyId;
+
+    // If we have a lastHistoryId, only fetch changes since then
+    const fetchParams = {
       userId: 'me',
       maxResults: 50,
-      q: 'in:inbox',
-    });
+      labelIds: ['INBOX'],
+    };
 
-    if (!res.data.messages) {
-      return NextResponse.json({ success: true, message: 'No emails found' });
+    if (lastHistoryId) {
+      fetchParams.historyTypes = ['messageAdded'];
+      fetchParams.startHistoryId = lastHistoryId;
     }
 
+    const res = await gmail.users.messages.list(fetchParams);
+
+    if (!res.data.messages || res.data.messages.length === 0) {
+      return NextResponse.json({ success: true, message: 'No new emails found' });
+    }
+
+    // Process each new message
     const results = await Promise.allSettled(
       res.data.messages.map(async (message) => {
         try {
@@ -71,7 +87,7 @@ export async function POST() {
           const emailResult = await query(
             `INSERT INTO emails (
               message_id, thread_id, subject, sender, receiver, cc, bcc, 
-              snippet, internal_date, references, in_reply_to, body_text, body_html
+              snippet, internal_date, "references", in_reply_to, body_text, body_html
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT (message_id) DO NOTHING
             RETURNING id`,
@@ -81,7 +97,7 @@ export async function POST() {
           // Process attachments if email was inserted
           if (emailResult.rows.length > 0) {
             await processAttachments(
-              msg.data.payload,
+              msg.data,
               emailResult.rows[0].id,
               drive
             );
@@ -95,10 +111,16 @@ export async function POST() {
       })
     );
 
+    // Update lastHistoryId if we processed new messages
+    if (res.data.messages.length > 0) {
+      lastHistoryId = currentHistoryId;
+    }
+
     return NextResponse.json({
       success: true,
       processed: results.filter(r => r.status === 'fulfilled' && r.value.success).length,
       total: res.data.messages.length,
+      newHistoryId: currentHistoryId,
     });
 
   } catch (error) {
@@ -110,41 +132,51 @@ export async function POST() {
   }
 }
 
-// Helper functions
+// Improved email body extraction
 function extractEmailBody(payload) {
   let bodyText = '';
   let bodyHtml = '';
-  
+
+  function processPart(part) {
+    if (part.parts) {
+      part.parts.forEach(processPart);
+    }
+
+    if (part.mimeType === 'text/plain') {
+      bodyText += Buffer.from(part.body?.data || '', 'base64').toString('utf8');
+    } else if (part.mimeType === 'text/html') {
+      bodyHtml += Buffer.from(part.body?.data || '', 'base64').toString('utf8');
+    } else if (part.mimeType === 'multipart/alternative') {
+      part.parts.forEach(processPart);
+    }
+  }
+
   if (payload.parts) {
-    payload.parts.forEach(part => {
-      if (part.mimeType === 'text/plain') {
-        bodyText += Buffer.from(part.body.data, 'base64').toString('utf8');
-      } else if (part.mimeType === 'text/html') {
-        bodyHtml += Buffer.from(part.body.data, 'base64').toString('utf8');
-      }
-    });
+    payload.parts.forEach(processPart);
   } else if (payload.mimeType === 'text/plain') {
-    bodyText = Buffer.from(payload.body.data, 'base64').toString('utf8');
+    bodyText = Buffer.from(payload.body?.data || '', 'base64').toString('utf8');
   } else if (payload.mimeType === 'text/html') {
-    bodyHtml = Buffer.from(payload.body.data, 'base64').toString('utf8');
+    bodyHtml = Buffer.from(payload.body?.data || '', 'base64').toString('utf8');
   }
 
   return { bodyText, bodyHtml };
 }
 
-async function processAttachments(payload, emailId, drive) {
-  if (!payload.parts) return;
+// Enhanced attachment processing
+async function processAttachments(message, emailId, drive) {
+  if (!message.payload?.parts) return;
 
-  const attachments = payload.parts.filter(
-    part => part.filename && part.filename.length > 0
+  const attachments = message.payload.parts.filter(
+    (part) => part.filename && part.filename.length > 0 && part.body?.attachmentId
   );
 
   await Promise.all(
     attachments.map(async (part) => {
       try {
-        const attachment = await gmail.users.messages.attachments.get({
+        // Get attachment data
+        const attachment = await drive.users.messages.attachments.get({
           userId: 'me',
-          messageId: payload.messageId || payload.id,
+          messageId: message.id,
           id: part.body.attachmentId,
         });
 
@@ -160,17 +192,20 @@ async function processAttachments(payload, emailId, drive) {
           body: fileData,
         };
 
+        // Upload to Google Drive
         const file = await drive.files.create({
           resource: fileMetadata,
           media: media,
           fields: 'id,name,webViewLink,mimeType,size',
         });
 
+        // Store in database
         await query(
           `INSERT INTO email_attachments
            (email_id, drive_file_id, file_name, mime_type, size)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [emailId, file.data.id, part.filename, part.mimeType, file.data.size]
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (email_id, drive_file_id) DO NOTHING`,
+          [emailId, file.data.id, part.filename, part.mimeType, file.data.size || 0]
         );
       } catch (error) {
         console.error(`Failed to process attachment ${part.filename}:`, error);

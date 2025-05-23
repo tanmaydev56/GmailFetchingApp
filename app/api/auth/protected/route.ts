@@ -1,6 +1,6 @@
 // app/api/auth/protected/route.ts
 import { getServerSession } from "next-auth";
-import { authOptions } from "../[...nextauth]";
+import { authOptions } from "../[...nextauth]/route";
 import { NextResponse } from "next/server";
 
 export async function GET() {
