@@ -96,11 +96,8 @@ export async function POST() {
 
           // Process attachments if email was inserted
           if (emailResult.rows.length > 0) {
-            await processAttachments(
-              msg.data,
-              emailResult.rows[0].id,
-              drive
-            );
+            await processAttachments(msg.data, emailResult.rows[0].id, gmail, drive);
+
           }
 
           return { success: true, id: message.id };
@@ -163,49 +160,50 @@ function extractEmailBody(payload) {
 }
 
 // Enhanced attachment processing
-async function processAttachments(message, emailId, drive) {
+async function processAttachments(message, emailId, gmail, drive) {
   if (!message.payload?.parts) return;
 
   const attachments = message.payload.parts.filter(
-    (part) => part.filename && part.filename.length > 0 && part.body?.attachmentId
+    (part) => part.filename && part.body?.attachmentId
   );
 
   await Promise.all(
     attachments.map(async (part) => {
       try {
-        // Get attachment data
-        const attachment = await drive.users.messages.attachments.get({
-          userId: 'me',
+        // Correctly get attachment data from Gmail API
+        const attachment = await gmail.users.messages.attachments.get({
+          userId:'me',
           messageId: message.id,
           id: part.body.attachmentId,
         });
 
         const fileData = Buffer.from(attachment.data.data, 'base64');
+
         const fileMetadata = {
           name: part.filename,
-          mimeType: part.mimeType,
+          mimeType: part.mimeType || 'application/octet-stream',
           parents: [process.env.GOOGLE_DRIVE_FOLDER_ID],
         };
 
         const media = {
-          mimeType: part.mimeType,
+          mimeType: part.mimeType || 'application/octet-stream',
           body: fileData,
         };
 
         // Upload to Google Drive
         const file = await drive.files.create({
           resource: fileMetadata,
-          media: media,
+          media,
           fields: 'id,name,webViewLink,mimeType,size',
         });
 
-        // Store in database
+        // Store metadata in your database
         await query(
           `INSERT INTO email_attachments
            (email_id, drive_file_id, file_name, mime_type, size)
            VALUES ($1, $2, $3, $4, $5)
            ON CONFLICT (email_id, drive_file_id) DO NOTHING`,
-          [emailId, file.data.id, part.filename, part.mimeType, file.data.size || 0]
+          [emailId, file.data.id, part.filename, part.mimeType || 'application/octet-stream', file.data.size || 0]
         );
       } catch (error) {
         console.error(`Failed to process attachment ${part.filename}:`, error);
