@@ -58,7 +58,8 @@ export async function POST() {
             userId: 'me',
             id: message.id,
             format: 'full',
-          });
+          }); 
+          
 
           const headers = msg.data.payload?.headers || [];
           const getHeader = (name) => headers.find((h) => h.name === name)?.value || null;
@@ -166,6 +167,7 @@ async function processAttachments(message, emailId, gmail, drive) {
   const attachments = message.payload.parts.filter(
     (part) => part.filename && part.body?.attachmentId
   );
+  console.log(`Found ${attachments.length} attachments for email ID ${emailId}`);
 
   await Promise.all(
     attachments.map(async (part) => {
