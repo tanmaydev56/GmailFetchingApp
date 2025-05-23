@@ -111,7 +111,7 @@ export default function EmailList({
                 <p className="text-sm font-medium text-gray-500 mb-2">Attachments:</p>
                 <div className="flex gap-3 flex-wrap">
                   {email.attachments.map((attachment: any) => (
-                    <Link
+                    <a
                       key={attachment.id}
                       href={attachment.url}
                       target="_blank"
@@ -122,7 +122,7 @@ export default function EmailList({
                       <span className="text-gray-500 text-xs whitespace-nowrap">
                         ({formatBytes(attachment.size || 0)})
                       </span>
-                    </Link>
+                    </a>
                   ))}
                 </div>
               </div>
