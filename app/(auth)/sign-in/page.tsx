@@ -6,7 +6,7 @@ import LoginPage from "@/components/Login";
 
 import { Suspense } from "react";
 
-export default function SignInPage() {
+export default function page() {
  
   return (
     <Suspense fallback={<Loader/>}>

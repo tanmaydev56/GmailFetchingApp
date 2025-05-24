@@ -1,24 +1,19 @@
 // app/(auth)/sign-up/page.tsx
 "use client";
 
-import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import Loader from "@/components/Loader";
+import SignUpPage from "@/components/SignUpPage";
 
-export default function SignUpPage() {
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+import { Suspense } from "react";
+
+export default function page() {
+  
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="bg-white p-8 rounded shadow-md text-center">
-        <h1 className="text-2xl mb-4">Sign Up</h1>
-        <button
-          onClick={() => signIn("google", { callbackUrl })}
-          className="bg-green-500 text-white px-4 py-2 rounded"
-        >
-          Sign up with Google
-        </button>
-      </div>
-    </div>
+   <Suspense fallback={<Loader/>}>
+     {/* Suspense is used to handle loading states for components */}
+     {/* This allows us to show a loader while the SignUpPage is being loaded */}
+    <SignUpPage/>
+   </Suspense>
   );
 }
