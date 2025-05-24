@@ -1,0 +1,21 @@
+This error indicates your application is trying to make a fetch request to localhost:3000 in production, which won't work since your production app isn't running locally. Here's how to fix it:
+
+Root Cause
+The error shows:
+
+fetch failed... ECONNREFUSED 127.0.0.1:3000
+This means somewhere in your /dashboard page, you're making API requests to http://localhost:3000 instead of using relative paths or environment variables.
+
+Solution
+Fix API Request URLs:
+In your dashboard page or components, replace hardcoded localhost URLs with:
+
+typescript
+// Before
+const res = await fetch('http://localhost:3000/api/emails')
+
+// After (use relative path)
+const res = await fetch('/api/emails')
+
+// Or better, use environment variable
+const res = await fetch(`${process.env.NEXTAUTH_URL}/api/emails`)
