@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
+import Loader from './Loader';
 
 export default function EmailList({
   emails,
@@ -72,7 +73,8 @@ export default function EmailList({
           disabled={isLoading}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400"
         >
-          {isLoading ? 'Processing...' : 'Fetch New Emails'}
+          {isLoading ? (<div className='flex'><Loader />
+        <p>Loading...</p></div>) : 'Fetch New Emails'}
         </button>
       </div>
 
