@@ -2,8 +2,7 @@
 
 A Next.js application for efficient email management with Gmail API integration, attachment handling, Neon PostgreSQL database, and secure OAuth 2.0 authentication.
 
-![App Screenshot]((https://github.com/user-attachments/assets/f828b600-96ae-477d-bbbc-854f26aa5626))
-
+![App Screenshot](https://github.com/user-attachments/assets/f828b600-96ae-477d-bbbc-854f26aa5626)
 ## Features
 
 - **Email Management**
